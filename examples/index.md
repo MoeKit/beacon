@@ -15,7 +15,11 @@ seajs.use('index', function(Beacon) {
     retry:2,
     concurrent:3,
     defer:2000
+  }).on('all',function(event){
+    console.log(event);
   });
+
+  console.log(be2);
   console.log(be2.options);
     be2.log({
       hello:'world'

@@ -1,3 +1,7 @@
+var queryString = require('query-string'),
+    Eventor = require('eventor');
+Eventor.mixTo(BGIF);
+
 /**
  * @param {String} beacon The fully qualified HTTP resource to handle
  *                 requests.
@@ -20,6 +24,7 @@ function BGIF(path, options) {
     this.connections = [];
     this.tzoffset = (new Date()).getTimezoneOffset();
 }
+
 /**
  * LOG DAT!
  *
@@ -43,8 +48,10 @@ BGIF.prototype.log = function (kv, options) {
     if (this.concurrent >= 0 && this.connections.length >= this.concurrent) {
         if (errorCallback && retry >= this.retry) {
             errorCallback('max', kv, options);
+            this.trigger('error', kv, options);
         } else {
             options.retry = ++retry;
+            _this.trigger('retry', kv, options);
             this.log(kv, options);
         }
         return;
@@ -53,50 +60,47 @@ BGIF.prototype.log = function (kv, options) {
 
     var time = (new Date()).getTime(), that = this, v;
     var connection = setTimeout(function () {
-        var src, timeout, params = [],
+        var src, timeout, params = queryString.stringify(kv),
             img = new Image();
         // kv.client_time = time;
         // kv.client_tzoffset = that.tzoffset;
-        for (var k in kv) {
-            v = kv[k];
-            if (typeof v === 'function') {
-                v = v();
-            }
-            params = params.concat(
-                ['&', encodeURIComponent(k), '=', encodeURIComponent(v)]
-            );
-        }
-        src = that.path + '?' + params.join('').substr(1);
+        src = that.path + '?' + params;
         timeout = setTimeout(function () {
             img = null;
             that._removeConnection(connection);
             if (errorCallback && retry >= _this.retry) {
                 errorCallback('timeout', kv, options);
+                _this.trigger('error', kv, options);
             } else {
                 options.retry = ++retry;
+                _this.trigger('retry', kv, options);
                 _this.log(kv, options);
             }
         }, that.timeout);
-        img.onload = img.onerror = function () {
+        img.onload = img.onerror = function (event) {
             var etype = event.type;
             clearTimeout(timeout);
             that._removeConnection(connection);
             if (errorCallback && etype === 'error') {
                 if (retry >= _this.retry) {
                     errorCallback('load', kv, options);
+                    _this.trigger('error', kv, options);
                 } else {
                     retry++;
                     options.retry = retry;
+                    _this.trigger('retry', kv, options);
                     _this.log(kv, options);
                 }
             }
             if (successCallback && etype === 'load') {
                 successCallback('load', kv, options);
+                _this.trigger('success', kv, options);
             }
         };
         img.src = src;
     }, _this.defer);
     _this.connections.push(connection);
+    return _this;
 };
 BGIF.prototype._removeConnection = function (connection) {
     for (var i = 0, l = this.connections.length; i < l; i++) {

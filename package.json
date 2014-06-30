@@ -16,6 +16,8 @@
   "spm": {
     "main": "index.js",
     "dependencies": {
+      "query-string": "1.0.0",
+      "eventor": "0.0.1"
     },
     "devDependencies": {
       "expect.js": "0.3.1"
